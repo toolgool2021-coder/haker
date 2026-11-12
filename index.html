@@ -1,0 +1,495 @@
+
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>TL // CYBER TERMINAL</title>
+<style>
+:root {
+  --green:#00ff9d;
+  --dim:#086b4c;
+  --red:#ff365d;
+  --bg:#020807;
+}
+*{box-sizing:border-box}
+body{
+  margin:0;background:var(--bg);color:var(--green);
+  font-family:Consolas,monospace;overflow:hidden;
+}
+canvas#matrix{position:fixed;inset:0;z-index:-2;opacity:.25}
+body:after{
+  content:"";position:fixed;inset:0;pointer-events:none;
+  background:repeating-linear-gradient(
+    transparent 0px,rgba(0,0,0,.25) 2px,
+    transparent 4px
+  );z-index:20;
+}
+header{
+  height:55px;border-bottom:1px solid var(--dim);
+  background:#02140edc;display:flex;align-items:center;
+  justify-content:space-between;padding:0 20px;
+  box-shadow:0 0 25px #00ff9d22;
+}
+.logo{font-size:20px;font-weight:bold;letter-spacing:3px}
+.live{font-size:11px;animation:blink 1s infinite}
+@keyframes blink{50%{opacity:.25}}
+.dashboard{
+  display:grid;grid-template-columns:1fr 290px;
+  height:calc(100vh - 55px);gap:10px;padding:10px;
+}
+.panel{
+  border:1px solid #08734d;background:#020d0be8;
+  box-shadow:inset 0 0 30px #00ff9d08;
+  min-height:0;overflow:hidden;
+}
+.title{
+  background:#063c2b;padding:9px 12px;font-size:12px;
+  letter-spacing:2px;border-bottom:1px solid var(--dim);
+}
+.terminal{display:flex;flex-direction:column}
+#output{
+  flex:1;overflow:auto;padding:15px;font-size:12px;
+  line-height:1.7;scrollbar-color:#07583b transparent;
+  overflow-wrap:anywhere;
+}
+.line{animation:appear .15s ease}
+@keyframes appear{from{opacity:0;transform:translateY(5px)}}
+.error{color:var(--red)}
+.warning{color:#ffce57}
+.info{color:#4ac8ff}
+.command{color:white}
+.inputbar{
+  border-top:1px solid var(--dim);padding:12px;
+  display:flex;gap:10px;background:#02150e;
+}
+input{
+  background:none;border:none;outline:none;
+  color:var(--green);font:13px Consolas,monospace;
+  width:100%;min-width:0;
+}
+.side{display:flex;flex-direction:column;gap:10px;min-height:0}
+.stats{padding:12px;font-size:11px}
+.stat{margin-bottom:15px}
+.statlabel{display:flex;justify-content:space-between}
+.bar{height:4px;background:#063b2a;margin-top:6px}
+.fill{height:100%;background:var(--green);width:40%;transition:width .5s}
+.radar{
+  width:190px;height:190px;border:1px solid var(--green);
+  border-radius:50%;margin:15px auto;position:relative;
+  background:repeating-radial-gradient(
+    circle,transparent 0 27px,#00ff9d24 28px 29px
+  );
+  overflow:hidden;
+}
+.radar:before,.radar:after{
+  content:"";position:absolute;background:#00ff9d35;
+}
+.radar:before{width:1px;height:100%;left:50%}
+.radar:after{height:1px;width:100%;top:50%}
+.sweep{
+  position:absolute;inset:0;border-radius:50%;
+  background:conic-gradient(transparent 0deg,
+    #00ff9d00 260deg,#00ff9d80 360deg);
+  animation:rotate 3s linear infinite;
+}
+@keyframes rotate{to{transform:rotate(360deg)}}
+.dot{
+  position:absolute;width:5px;height:5px;
+  background:#00ff9d;border-radius:50%;
+  box-shadow:0 0 10px #00ff9d;
+  animation:blink 2s infinite;
+}
+.buttons{
+  display:grid;grid-template-columns:1fr 1fr;gap:7px;padding:10px;
+}
+button{
+  background:#032619;border:1px solid #087d52;
+  color:var(--green);padding:10px 4px;
+  font:10px Consolas,monospace;cursor:pointer;
+  transition:.2s;
+}
+button:hover{
+  background:#00ff9d;color:#001b12;
+  box-shadow:0 0 15px #00ff9d88;
+}
+.graph{height:65px;width:100%;display:block}
+.glitch{animation:glitch .12s infinite}
+@keyframes glitch{
+  0%{filter:hue-rotate(0);transform:translate(0)}
+  25%{filter:hue-rotate(120deg);transform:translate(3px,-1px)}
+  50%{transform:translate(-3px,2px)}
+  75%{filter:hue-rotate(240deg);transform:translate(2px,1px)}
+}
+#alert{
+  position:fixed;inset:0;background:#ff003322;
+  border:15px solid #ff1744;display:none;z-index:30;
+  align-items:center;justify-content:center;
+  color:white;font-size:clamp(25px,6vw,65px);
+  font-weight:bold;text-shadow:0 0 30px red;
+  animation:blink .35s infinite;pointer-events:none;
+}
+#codeRain{
+  position:fixed;right:305px;top:65px;
+  width:230px;max-width:25vw;opacity:.25;
+  font-size:10px;line-height:1.4;pointer-events:none;
+  overflow:hidden;height:calc(100vh - 90px);
+  word-break:break-all;z-index:-1;
+}
+@media(max-width:750px){
+  .dashboard{grid-template-columns:1fr;grid-template-rows:60% 40%}
+  .side{display:grid;grid-template-columns:1fr 1fr;overflow:auto}
+  .radar{width:115px;height:115px}
+  #codeRain{display:none}
+  header{padding:0 10px}
+  .logo{font-size:15px}
+}
+</style>
+</head>
+<body>
+<canvas id="matrix"></canvas>
+<div id="codeRain"></div>
+<div id="alert">SYSTEM BREACH</div>
+
+<header>
+  <div class="logo">TL<span style="color:white"> // </span>CYBER SYSTEM</div>
+  <div class="live">● SYSTEM ONLINE <span id="clock"></span></div>
+</header>
+
+<div class="dashboard">
+  <section class="panel terminal">
+    <div class="title">▣ ROOT TERMINAL // VISUAL SIMULATION</div>
+    <div id="output"></div>
+    <div class="inputbar">
+      <span>root@TL:~#</span>
+      <input id="cmd" autocomplete="off" spellcheck="false"
+        placeholder="Введите help..." autofocus>
+    </div>
+  </section>
+
+  <aside class="side">
+    <section class="panel">
+      <div class="title">◉ NETWORK RADAR</div>
+      <div class="radar">
+        <div class="sweep"></div>
+        <div class="dot" style="top:25%;left:65%"></div>
+        <div class="dot" style="top:67%;left:30%"></div>
+        <div class="dot" style="top:42%;left:80%"></div>
+      </div>
+      <div style="text-align:center;font-size:10px;padding-bottom:10px">
+        SIMULATED NODES: <span id="nodes">24</span>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="title">▤ SYSTEM MONITOR</div>
+      <div class="stats">
+        <div class="stat">
+          <div class="statlabel"><span>CPU LOAD</span><span id="cpuText">0%</span></div>
+          <div class="bar"><div class="fill" id="cpu"></div></div>
+        </div>
+        <div class="stat">
+          <div class="statlabel"><span>MEMORY</span><span id="memText">0%</span></div>
+          <div class="bar"><div class="fill" id="mem"></div></div>
+        </div>
+        <div class="stat">
+          <div class="statlabel"><span>NETWORK ACTIVITY</span><span id="netText">0%</span></div>
+          <div class="bar"><div class="fill" id="net"></div></div>
+        </div>
+        <canvas id="graph" class="graph"></canvas>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="title">⚡ QUICK OPERATIONS</div>
+      <div class="buttons">
+        <button onclick="execute('scan')">SCAN</button>
+        <button onclick="execute('decrypt')">DECRYPT</button>
+        <button onclick="execute('trace')">TRACE</button>
+        <button onclick="execute('matrix')">MATRIX</button>
+        <button onclick="execute('glitch')">GLITCH</button>
+        <button onclick="execute('alert')">ALERT</button>
+        <button onclick="execute('boot')">REBOOT</button>
+        <button onclick="execute('clear')">CLEAR</button>
+      </div>
+    </section>
+  </aside>
+</div>
+
+<script>
+// MATRIX BACKGROUND
+const canvas=document.getElementById("matrix");
+const ctx=canvas.getContext("2d");
+let drops=[],fontSize=14,matrixOn=true;
+
+function resize(){
+  canvas.width=innerWidth;
+  canvas.height=innerHeight;
+  drops=Array(Math.ceil(canvas.width/fontSize)).fill(0)
+    .map(()=>Math.random()*-80);
+}
+resize();
+window.addEventListener("resize",resize);
+
+function drawMatrix(){
+  if(!matrixOn)return;
+  ctx.fillStyle="rgba(0,8,5,.065)";
+  ctx.fillRect(0,0,canvas.width,canvas.height);
+  ctx.font=fontSize+"px monospace";
+  drops.forEach((y,i)=>{
+    const char="01アイウエオ<>/{}#$"[Math.floor(Math.random()*16)];
+    ctx.fillStyle=Math.random()>.97?"#ffffff":"#00ff88";
+    ctx.fillText(char,i*fontSize,y*fontSize);
+    if(y*fontSize>canvas.height&&Math.random()>.975)drops[i]=0;
+    else drops[i]+=.65;
+  });
+}
+setInterval(drawMatrix,40);
+
+// TERMINAL
+const output=document.getElementById("output");
+const input=document.getElementById("cmd");
+let busy=false;
+let timers=[];
+
+function log(message,type=""){
+  const div=document.createElement("div");
+  div.className="line "+type;
+  div.textContent=message;
+  output.appendChild(div);
+  if(output.children.length>350)output.firstChild.remove();
+  output.scrollTop=output.scrollHeight;
+}
+function wait(ms){return new Promise(r=>setTimeout(r,ms))}
+function random(min,max){
+  return Math.floor(Math.random()*(max-min+1))+min;
+}
+function hex(len=16){
+  return Array.from({length:len},()=>random(0,15).toString(16))
+    .join("").toUpperCase();
+}
+function ip(){
+  return `192.0.2.${random(1,254)}`;
+}
+async function sequence(lines,delay=280){
+  busy=true;
+  for(const item of lines){
+    log(item[0],item[1]||"");
+    await wait(delay);
+  }
+  busy=false;
+}
+function execute(raw){
+  const command=raw.trim().toLowerCase();
+  if(!command)return;
+  log("root@TL:~# "+command,"command");
+  if(busy&&command!=="clear"){
+    log("PROCESS BUSY // WAIT...","warning");return;
+  }
+  switch(command){
+    case "help":
+      log("AVAILABLE COMMANDS:","info");
+      log("scan    - simulated network scan");
+      log("decrypt - visual decryption sequence");
+      log("trace   - fictional route tracing");
+      log("matrix  - toggle matrix rain");
+      log("glitch  - screen distortion");
+      log("alert   - simulated security warning");
+      log("boot    - reboot animation");
+      log("status  - system information");
+      log("clear   - clear terminal");
+      log("spam    - rapid code stream");
+      log("ascii   - display TL signature");
+      break;
+
+    case "scan":
+      sequence([
+        ["[SCAN] Initializing virtual scanner...","info"],
+        ["[SCAN] Loading simulated network map..."],
+        ["[NODE] "+ip()+" // ACTIVE"],
+        ["[NODE] "+ip()+" // ACTIVE"],
+        ["[NODE] "+ip()+" // FILTERED","warning"],
+        ["[SCAN] Generating fake packet telemetry..."],
+        ["[SCAN] 128 virtual endpoints analyzed"],
+        ["[RESULT] Simulation complete. No real network accessed.","info"]
+      ],350);
+      break;
+
+    case "decrypt":
+      decrypt();
+      break;
+
+    case "trace":
+      sequence([
+        ["TRACE ENGINE INITIALIZED","info"],
+        ["HOP 01 // 192.0.2.1 // 12ms"],
+        ["HOP 02 // 198.51.100.12 // 28ms"],
+        ["HOP 03 // 203.0.113.45 // 46ms"],
+        ["HOP 04 // VIRTUAL GATEWAY // 63ms"],
+        ["TRACE COMPLETED // DEMO ROUTE","info"]
+      ],450);
+      break;
+
+    case "matrix":
+      matrixOn=!matrixOn;
+      log("MATRIX EFFECT: "+(matrixOn?"ENABLED":"DISABLED"),"info");
+      if(!matrixOn)ctx.clearRect(0,0,canvas.width,canvas.height);
+      break;
+
+    case "glitch":
+      document.body.classList.add("glitch");
+      log("VISUAL DISTORTION ACTIVATED","warning");
+      setTimeout(()=>document.body.classList.remove("glitch"),1500);
+      break;
+
+    case "alert":
+      document.getElementById("alert").style.display="flex";
+      log("WARNING // SIMULATED SECURITY EVENT","error");
+      setTimeout(()=>document.getElementById("alert").style.display="none",1800);
+      break;
+
+    case "boot":
+      sequence([
+        ["TL CYBER BIOS v4.7","info"],
+        ["Checking virtual memory... OK"],
+        ["Loading animation engine... OK"],
+        ["Initializing graphics... OK"],
+        ["Mounting simulation modules... OK"],
+        ["SYSTEM READY","info"]
+      ],420);
+      break;
+
+    case "status":
+      log("TL CYBER SYSTEM // VERSION 4.7","info");
+      log("MODE: OFFLINE VISUAL SIMULATION");
+      log("NETWORK ACCESS: NONE");
+      log("ENCRYPTION DISPLAY: DEMO");
+      log("SESSION ID: "+hex(12));
+      break;
+
+    case "clear":
+      output.innerHTML="";
+      break;
+
+    case "spam":
+      spam();
+      break;
+
+    case "ascii":
+      log("████████╗██╗     ");
+      log("╚══██╔══╝██║     ");
+      log("   ██║   ██║     ");
+      log("   ██║   ██║     ");
+      log("   ██║   ███████╗");
+      log("   ╚═╝   ╚══════╝");
+      log("TOOLGOOL // CYBER INTERFACE","info");
+      break;
+
+    default:
+      log("UNKNOWN COMMAND: "+command,"error");
+      log("TYPE 'help' FOR COMMAND LIST");
+  }
+}
+
+async function decrypt(){
+  busy=true;
+  log("DECRYPTION VISUALIZER STARTED","info");
+  for(let i=0;i<=100;i+=4){
+    log("["+String(i).padStart(3,"0")+"%] "+
+      hex(24)+"  "+hex(12));
+    await wait(65);
+  }
+  log("DEMO KEY: TL-"+hex(20),"warning");
+  log("VISUAL DECRYPTION COMPLETE","info");
+  busy=false;
+}
+
+async function spam(){
+  busy=true;
+  const words=["MEMORY_MAP","BUFFER","VIRTUAL_NODE",
+    "KERNEL_SIM","PACKET_DEMO","DATA_STREAM"];
+  for(let i=0;i<90;i++){
+    log("0x"+hex(8)+" :: "+words[random(0,words.length-1)]
+      +" :: "+hex(24));
+    await wait(24);
+  }
+  busy=false;
+}
+
+input.addEventListener("keydown",e=>{
+  if(e.key==="Enter"){
+    const value=input.value;
+    input.value="";
+    execute(value);
+  }
+});
+
+// DYNAMIC SYSTEM MONITOR
+function updateStat(id,text,min,max){
+  const n=random(min,max);
+  document.getElementById(id).style.width=n+"%";
+  document.getElementById(text).textContent=n+"%";
+}
+setInterval(()=>{
+  updateStat("cpu","cpuText",18,93);
+  updateStat("mem","memText",35,79);
+  updateStat("net","netText",12,99);
+  document.getElementById("nodes").textContent=random(19,46);
+},1100);
+
+// LIVE GRAPH
+const graph=document.getElementById("graph");
+const g=graph.getContext("2d");
+let values=Array(60).fill(30);
+function drawGraph(){
+  graph.width=graph.clientWidth*devicePixelRatio;
+  graph.height=graph.clientHeight*devicePixelRatio;
+  g.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);
+  const w=graph.clientWidth,h=graph.clientHeight;
+  values.shift();values.push(random(8,90));
+  g.clearRect(0,0,w,h);
+  g.strokeStyle="#00ff9d";
+  g.lineWidth=1.5;
+  g.beginPath();
+  values.forEach((v,i)=>{
+    const x=i/(values.length-1)*w;
+    const y=h-v/100*h;
+    if(i===0)g.moveTo(x,y);else g.lineTo(x,y);
+  });
+  g.stroke();
+}
+setInterval(drawGraph,120);
+
+// DECORATIVE HEX STREAM
+const codeRain=document.getElementById("codeRain");
+setInterval(()=>{
+  codeRain.textContent=Array.from({length:100},
+    ()=>hex(8)+" 0x"+hex(4)).join("\n");
+  codeRain.style.whiteSpace="pre-wrap";
+},180);
+
+// CLOCK
+setInterval(()=>{
+  document.getElementById("clock").textContent=
+    new Date().toLocaleTimeString("ru-RU");
+},1000);
+
+// STARTUP
+(async()=>{
+  const startup=[
+    "TL CYBER TERMINAL // INITIALIZING...",
+    "LOADING VISUAL MODULES...",
+    "CONNECTING TO VIRTUAL CORE...",
+    "MATRIX RENDERER ONLINE",
+    "SIMULATION ENVIRONMENT READY",
+    "WELCOME, TOOLGOOL.",
+    "TYPE 'help' TO VIEW COMMANDS."
+  ];
+  for(const s of startup){
+    log(s,"info");
+    await wait(240);
+  }
+})();
+</script>
+</body>
+</html>
